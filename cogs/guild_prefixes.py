@@ -1,8 +1,19 @@
 import json
+import sqlite3
 import discord
 from discord.ext import commands
 from discord.utils import get
 
+def get_prefix(bot, message):
+    if message.guild is None:
+        return '.'
+    else:
+        conn = sqlite3.connect('prefixes.db')
+        c = conn.cursor()
+        c.execute("SELECT prefix FROM prefixes WHERE guild_id=?", (message.guild.id,))
+        return str(c.fetchone()[0])
+        conn.commit()
+        conn.close()
 
 class Mod_Commands(commands.Cog):
 
@@ -11,34 +22,28 @@ class Mod_Commands(commands.Cog):
 
     @commands.Cog.listener()
     async def on_guild_join(self, guild):
-        with open('prefixes.json', 'r') as f:
-            prefixes = json.load(f)
-
-        prefixes[str(guild.id)] = '.'
-
-        with open('prefixes.json', 'w') as f:
-            json.dump(prefixes, f, indent=4)
+        conn = sqlite3.connect('prefixes.db')
+        c = conn.cursor()
+        c.execute("INSERT INTO prefixes VALUES (?, ?)", (guild.id, '.'))
+        conn.commit()
+        conn.close()
 
     @commands.Cog.listener()
     async def on_guild_remove(self, guild):
-        with open('prefixes.json', 'r') as f:
-            prefixes = json.load(f)
-
-        prefixes.pop(str(guild.id))
-
-        with open('prefixes.json', 'w') as f:
-            json.dump(prefixes, f, indent=4)
+        conn = sqlite3.connect('prefixes.db')
+        c = conn.cursor()
+        c.execute("DELETE FROM prefixes WHERE guild_id=?", (guild.id, ))
+        conn.commit()
+        conn.close()
 
     @commands.command()
     @commands.has_permissions(administrator=True)
     async def changeprefix(self, ctx, prefix):
-        with open('prefixes.json', 'r') as f:
-            prefixes = json.load(f)
-
-        prefixes[str(ctx.guild.id)] = prefix
-
-        with open('prefixes.json', 'w') as f:
-            json.dump(prefixes, f, indent=4)
+        conn = sqlite3.connect('prefixes.db')
+        c = conn.cursor()
+        c.execute("UPDATE prefixes SET prefix=? WHERE guild_id=?", (prefix, ctx.guild.id))
+        conn.commit()
+        conn.close()
 
         await ctx.send(f'Prefix changed to: {prefix}')
 
